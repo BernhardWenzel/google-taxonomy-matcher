@@ -1,0 +1,11 @@
+PyYAML==3.10
+Whoosh==2.5.3
+argparse==1.2.1
+distribute==0.6.24
+numpy==1.7.1
+pandas==0.12.0
+python-dateutil==2.1
+pytz==2013d
+requests==1.2.3
+six==1.4.1
+wsgiref==0.1.2

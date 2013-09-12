@@ -1,0 +1,19 @@
+# This is a sample settings file
+# Make a copy name 'settings.yaml' and modify
+# This step is optional, all settings in this sample file are the default values
+
+google_taxonomy_file: taxonomy.en-US.txt
+google_taxonomy_url: http://www.google.com/basepages/producttype/taxonomy.en-GB.txt
+fetch_taxonomy_online: true
+product_file: product.csv
+output_product_file: product.matched.csv
+product_columns:
+  - title
+  - product type
+  - description
+product_column_weights:
+  - 3
+  - 2
+  - 1
+google_category_column: google product category
+overwrite_category: false
