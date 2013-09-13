@@ -3,6 +3,7 @@ import argparse
 import logging
 
 import pandas as pd
+from pandas.core.series import Series
 import requests
 from whoosh import writing
 from yaml import load, Loader
@@ -32,7 +33,8 @@ def load_taxonomy(base_category, taxonomy_file, taxonomy_url, fetch_online=False
 
 
 def index_product_info(product_dict):
-    schema = Schema(path=ID(stored=True, analyzer=StemmingAnalyzer()), content=TEXT(stored=True, analyzer=StemmingAnalyzer()))
+    schema = Schema(path=ID(stored=True, analyzer=StemmingAnalyzer()),
+                    content=TEXT(stored=True, analyzer=StemmingAnalyzer()))
     st = RamStorage()
     st.create()
     ix = st.create_index(schema)
@@ -81,7 +83,7 @@ def get_category(string):
 def get_best_match(matches):
     if not matches:
         return ''
-    # find most hits
+        # find most hits
     best_score = 0
     best_category = None
     for match, score in matches.items():
@@ -105,9 +107,12 @@ def safe_get(row, column):
 
 
 if __name__ == "__main__":
+
     # read command line arguments
     parser = argparse.ArgumentParser(description='Finds category based on Google\'s taxonomy in a product description')
-    parser.add_argument('base_category', metavar='bc', help='The base categories of the product. Can speed up execution a lot. Example: "Furniture", "Home & Garden"', nargs="*")
+    parser.add_argument('base_category', metavar='bc',
+                        help='The base categories of the product. Can speed up execution a lot. Example: "Furniture", "Home & Garden"',
+                        nargs="*")
     parser.add_argument('-o', '--overwrite', const=True, nargs="?",
                         help='If set category column in product file will be overwritten')
     parser.add_argument('--log', nargs="?", help="The log level")
@@ -127,7 +132,7 @@ if __name__ == "__main__":
     product_file = settings.get("product_file", "product.csv")
     output_product_file = settings.get("output_product_file", "product.matched.csv")
     product_columns = settings.get("product_columns", ["title", "product type", "description"])
-    product_column_weights = settings.get("product_column_weights", [3,2,1])
+    product_column_weights = settings.get("product_column_weights", [3, 2, 1])
     weights = {}
     for index, pc in enumerate(product_columns):
         weights[pc] = product_column_weights[index]
@@ -152,6 +157,10 @@ if __name__ == "__main__":
     print "Parsing input file: %s" % product_file
     product_data = pd.read_csv(product_file, sep='\t', usecols=product_columns + [google_category_column])
     print "Processing %d rows ..." % product_data.shape[0]
+
+    # if target google category column doesnt exist in file: add
+    if not google_category_column in product_data.columns:
+        product_data[google_category_column] = Series()
 
     # iterate through data row by row and match category
     index = 1
@@ -189,9 +198,10 @@ if __name__ == "__main__":
         logging.debug("======> best match: %s" % best_match)
 
         if not gcat or overwrite_category:
-                if best_match:
-                    row[google_category_column] = best_match
-                    replacements += 1
+            if best_match:
+                product_data.ix[index - 2, google_category_column] = best_match
+                # row[google_category_column] = best_match
+                replacements += 1
 
     # write back result
     # copy category column into original file
@@ -200,7 +210,8 @@ if __name__ == "__main__":
     original_data = pd.read_csv(product_file, sep='\t')
     original_data[google_category_column] = gcat_col
     original_data.to_csv(output_product_file, sep='\t', index=False)
-    print "processed %d rows of '%s', replaced %d,  output written to '%s'" % ((index - 1), product_file, replacements, output_product_file)
+    print "processed %d rows of '%s', replaced %d,  output written to '%s'" % (
+        (index - 1), product_file, replacements, output_product_file)
 
 
 
