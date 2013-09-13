@@ -1,5 +1,6 @@
 import os
 import argparse
+import logging
 
 import pandas as pd
 import requests
@@ -48,17 +49,21 @@ def match(ix, category, weights=None):
 
     # adjust query
     # we strip of & and comma and combine all words in an OR query
-    query = re.sub('[,&]', ' ', c)
-    query = " OR ".join(query.split())
+    query = re.sub('[,&]', ' OR ', c)
+    # query = " OR ".join(query.split())
 
     with ix.searcher() as searcher:
         parsed_query = QueryParser("content", schema=ix.schema, termclass=Variations).parse(query)
         results = searcher.search(parsed_query, terms=True)
         score = 0
+        if results:
+            logging.debug("Category: %s => Query: %s" % (category, query))
         for r in results:
             weight = 1
             if weights:
                 weight = weights[r['path']]
+
+            logging.debug("Result: %s [score: %d weight: %d]" % (r, r.score, weight))
             score += r.score * weight
 
         return score
@@ -77,7 +82,7 @@ def get_category(string):
 def get_best_match(matches):
     if not matches:
         return ''
-        # find most hits
+    # find most hits
     best_score = 0
     best_category = None
     for match, score in matches.items():
@@ -106,7 +111,12 @@ if __name__ == "__main__":
     parser.add_argument('base_category', metavar='bc', help='The base categories of the product. Can speed up execution a lot. Example: "Furniture", "Home & Garden"', nargs="*")
     parser.add_argument('-o', '--overwrite', const=True, nargs="?",
                         help='If set category column in product file will be overwritten')
+    parser.add_argument('--log', nargs="?", help="The log level")
     args = parser.parse_args()
+
+    # logging
+    if args.log:
+        logging.basicConfig(level=args.log.upper())
 
     # load settings
     settings = {}
@@ -130,19 +140,27 @@ if __name__ == "__main__":
         overwrite_category = settings.get("overwrite_category", False)
 
     # load taxonomy
+    print "Loading taxonomy. Base categories: %s ..." % ", ".join(args.base_category)
     categories = load_taxonomy(args.base_category, taxonomy_file=taxonomy_file, taxonomy_url=taxonomy_url,
                                fetch_online=fetch_online)
     if not categories:
         print "Error: base category %s not found in taxonomy" % args.base_category
 
+    if not args.base_category:
+        print "Warning: you did not specify a base category. This can take *very* long time to complete. See matcher -h for help."
+
     # load product csv file
+    print "Parsing input file: %s" % product_file
     product_data = pd.read_csv(product_file, sep='\t', usecols=product_columns + [google_category_column])
+    print "Processing %d rows ..." % product_data.shape[0]
 
     # iterate through data row by row and match category
     index = 1
     replacements = 0
     for row_index, row in product_data.iterrows():
         index += 1
+        if index % 10 == 0:
+            print "Progress: %d rows finished" % index
         p = {}
         for col in product_columns:
             value = safe_get(row, col)
@@ -156,7 +174,8 @@ if __name__ == "__main__":
         # find all matches
         matches = {}
         for category in categories:
-            if not category: continue
+            if not category:
+                continue
             score = match(ix, category, weights)
             if score:
                 if not matches.get(category):
@@ -166,10 +185,14 @@ if __name__ == "__main__":
 
         # select best match
         best_match = get_best_match(matches)
+
+        logging.debug("MATCHES: %s" % str(matches))
+        logging.debug("======> best match: %s" % best_match)
+
         if not gcat or overwrite_category:
-            if best_match:
-                row[google_category_column] = best_match
-                replacements += 1
+                if best_match:
+                    row[google_category_column] = best_match
+                    replacements += 1
 
     # write back result
     # copy category column into original file
