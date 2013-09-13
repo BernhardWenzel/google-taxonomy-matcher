@@ -48,9 +48,8 @@ def match(ix, category, weights=None):
     index, c = get_category(category)
 
     # adjust query
-    # we strip of & and comma and combine all words in an OR query
+    # replace comma and ampersand with OR
     query = re.sub('[,&]', ' OR ', c)
-    # query = " OR ".join(query.split())
 
     with ix.searcher() as searcher:
         parsed_query = QueryParser("content", schema=ix.schema, termclass=Variations).parse(query)

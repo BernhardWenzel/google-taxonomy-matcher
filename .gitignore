@@ -48,6 +48,7 @@ indexdir
 .~lock.*
 settings.yaml
 product.csv
+product-full.csv
 product.matched.csv
 product1.csv
 taxonomy.txt
